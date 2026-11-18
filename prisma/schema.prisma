@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Sector {
+  id              String           @id @default(cuid())
+  name            String
+  code            String           @unique
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  users           User[]
+  persons         Person[]
+  familyBooks     FamilyBook[]
+  birthRecords    BirthRecord[]
+  deathRecords    DeathRecord[]
+  marriageRecords MarriageRecord[]
+  divorceRecords  DivorceRecord[]
+  identityCards   IdentityCard[]
+  auditLogs       AuditLog[]
+}
+
+model User {
+  id              String           @id @default(cuid())
+  name            String
+  email           String           @unique
+  passwordHash    String
+  role            String
+  sectorId        String?
+  sector          Sector?          @relation(fields: [sectorId], references: [id])
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  auditLogs       AuditLog[]
+  birthRecords    BirthRecord[]
+  deathRecords    DeathRecord[]
+  marriageRecords MarriageRecord[]
+  divorceRecords  DivorceRecord[]
+  identityCards   IdentityCard[]
+}
+
+model Person {
+  id                 String           @id @default(cuid())
+  nationalId         String           @unique
+  firstName          String
+  fatherName         String
+  grandfatherName    String
+  familyName         String
+  gender             String
+  birthDate          DateTime
+  birthPlace         String
+  lifeStatus         String           @default("ALIVE")
+  maritalStatus      String           @default("SINGLE")
+  fatherId           String?
+  motherId           String?
+  father             Person?          @relation("Paternal", fields: [fatherId], references: [id])
+  mother             Person?          @relation("Maternal", fields: [motherId], references: [id])
+  paternalChildren   Person[]         @relation("Paternal")
+  maternalChildren   Person[]         @relation("Maternal")
+  sectorId           String
+  sector             Sector           @relation(fields: [sectorId], references: [id])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  memberships        FamilyMember[]
+  headedBooks        FamilyBook[]     @relation("BookHead")
+  birthRecord        BirthRecord?     @relation("BirthSubject")
+  birthsAsFather     BirthRecord[]    @relation("BirthFather")
+  birthsAsMother     BirthRecord[]    @relation("BirthMother")
+  deathRecord        DeathRecord?
+  marriagesAsHusband MarriageRecord[] @relation("Husband")
+  marriagesAsWife    MarriageRecord[] @relation("Wife")
+  identityCards      IdentityCard[]
+
+  @@index([sectorId])
+  @@index([lifeStatus])
+}
+
+model FamilyBook {
+  id       String         @id @default(cuid())
+  number   String         @unique
+  sectorId String
+  sector   Sector         @relation(fields: [sectorId], references: [id])
+  headId   String
+  head     Person         @relation("BookHead", fields: [headId], references: [id])
+  openedAt DateTime
+  members  FamilyMember[]
+
+  @@index([sectorId])
+}
+
+model FamilyMember {
+  id           String     @id @default(cuid())
+  familyBookId String
+  familyBook   FamilyBook @relation(fields: [familyBookId], references: [id])
+  personId     String
+  person       Person     @relation(fields: [personId], references: [id])
+  relation     String
+  joinedAt     DateTime   @default(now())
+  active       Boolean    @default(true)
+
+  @@unique([familyBookId, personId])
+  @@index([personId])
+}
+
+model BirthRecord {
+  id          String   @id @default(cuid())
+  documentNo  String   @unique
+  personId    String   @unique
+  person      Person   @relation("BirthSubject", fields: [personId], references: [id])
+  fatherId    String?
+  father      Person?  @relation("BirthFather", fields: [fatherId], references: [id])
+  motherId    String?
+  mother      Person?  @relation("BirthMother", fields: [motherId], references: [id])
+  eventDate   DateTime
+  place       String
+  sectorId    String
+  sector      Sector   @relation(fields: [sectorId], references: [id])
+  registrarId String
+  registrar   User     @relation(fields: [registrarId], references: [id])
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@index([sectorId])
+}
+
+model DeathRecord {
+  id          String   @id @default(cuid())
+  documentNo  String   @unique
+  personId    String   @unique
+  person      Person   @relation(fields: [personId], references: [id])
+  eventDate   DateTime
+  place       String
+  cause       String?
+  sectorId    String
+  sector      Sector   @relation(fields: [sectorId], references: [id])
+  registrarId String
+  registrar   User     @relation(fields: [registrarId], references: [id])
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@index([sectorId])
+}
+
+model MarriageRecord {
+  id          String          @id @default(cuid())
+  documentNo  String          @unique
+  spouse1Id   String
+  spouse2Id   String
+  spouse1     Person          @relation("Husband", fields: [spouse1Id], references: [id])
+  spouse2     Person          @relation("Wife", fields: [spouse2Id], references: [id])
+  eventDate   DateTime
+  place       String
+  status      String          @default("ACTIVE")
+  sectorId    String
+  sector      Sector          @relation(fields: [sectorId], references: [id])
+  registrarId String
+  registrar   User            @relation(fields: [registrarId], references: [id])
+  notes       String?
+  createdAt   DateTime        @default(now())
+  divorce     DivorceRecord?
+
+  @@index([sectorId])
+  @@index([spouse1Id])
+  @@index([spouse2Id])
+}
+
+model DivorceRecord {
+  id          String         @id @default(cuid())
+  documentNo  String         @unique
+  marriageId  String         @unique
+  marriage    MarriageRecord @relation(fields: [marriageId], references: [id])
+  eventDate   DateTime
+  place       String
+  sectorId    String
+  sector      Sector         @relation(fields: [sectorId], references: [id])
+  registrarId String
+  registrar   User           @relation(fields: [registrarId], references: [id])
+  notes       String?
+  createdAt   DateTime       @default(now())
+
+  @@index([sectorId])
+}
+
+model IdentityCard {
+  id           String   @id @default(cuid())
+  cardNo       String   @unique
+  personId     String
+  person       Person   @relation(fields: [personId], references: [id])
+  issuedAt     DateTime
+  expiresAt    DateTime
+  status       String   @default("ACTIVE")
+  cancelReason String?
+  sectorId     String
+  sector       Sector   @relation(fields: [sectorId], references: [id])
+  issuerId     String
+  issuer       User     @relation(fields: [issuerId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([personId])
+  @@index([sectorId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  sectorId   String?
+  sector     Sector?  @relation(fields: [sectorId], references: [id])
+  entityType String
+  entityId   String
+  action     String
+  summary    String
+  createdAt  DateTime @default(now())
+
+  @@index([sectorId])
+  @@index([createdAt])
+}
